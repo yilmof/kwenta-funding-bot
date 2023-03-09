@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"kwenta_rates/contracts"
 	"log"
@@ -15,9 +16,14 @@ import (
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	isDocker := flag.Bool("docker", false, "use if running with docker")
+	flag.Parse()
+
+	if !*isDocker {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatal("Error loading .env file")
+		}
 	}
 
 	RPC_URL := os.Getenv("RPC_URL")
@@ -42,6 +48,9 @@ func main() {
 		"uni":   "0xda3a5e9502b23Eaedc8cC048998893013e09787d",
 	}
 
+	previousNotificationTime := time.Time{}
+
+	fmt.Println("Checking funding rates...")
 	for {
 		for symbol, contract_address := range kwenta_contracts {
 			address := common.HexToAddress(contract_address)
@@ -58,17 +67,21 @@ func main() {
 			formattedRate := (floatRate / 24) / 10000000000000000
 			var username = "Arb bot"
 			if formattedRate >= 0.01 || formattedRate <= -0.01 {
-				content := fmt.Sprintf("Funding rate on %s is now %f", symbol, formattedRate)
-				message := discordwebhook.Message{
-					Username: &username,
-					Content:  &content,
+				if time.Since(previousNotificationTime) >= (time.Minute * 30) {
+					content := fmt.Sprintf("Funding rate on %s is now %f", symbol, formattedRate)
+					message := discordwebhook.Message{
+						Username: &username,
+						Content:  &content,
+					}
+					err := discordwebhook.SendMessage(DISCORD_WEBHOOK_URL, message)
+					if err != nil {
+						log.Fatal(err)
+					}
+					fmt.Printf("%s: %f\n", symbol, formattedRate)
+					previousNotificationTime = time.Now()
+				} else {
+					fmt.Printf("%s: %f (Already sent notification within 30 minutes)\n", symbol, formattedRate)
 				}
-				err := discordwebhook.SendMessage(DISCORD_WEBHOOK_URL, message)
-				if err != nil {
-					log.Fatal(err)
-				}
-				fmt.Printf("%s: %f\n", symbol, formattedRate)
-				time.Sleep(30 * time.Second)
 			}
 		}
 		time.Sleep(time.Minute)
