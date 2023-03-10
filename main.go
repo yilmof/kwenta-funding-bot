@@ -4,15 +4,22 @@ import (
 	"flag"
 	"fmt"
 	"kwenta_rates/contracts"
+	"kwenta_rates/dydx"
 	"log"
+	"math"
 	"math/big"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/gtuk/discordwebhook"
+
 	"github.com/joho/godotenv"
+
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
+	"github.com/disgoorg/disgo/webhook"
 )
 
 func main() {
@@ -30,6 +37,11 @@ func main() {
 	DISCORD_WEBHOOK_URL := os.Getenv("DISCORD_WEBHOOK_URL")
 
 	client, err := ethclient.Dial(RPC_URL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	webhookClient, err := webhook.NewWithURL(DISCORD_WEBHOOK_URL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,25 +77,81 @@ func main() {
 			}
 			floatRate, _ := (big.NewFloat(0).SetInt(rate)).Float64()
 			formattedRate := (floatRate / 24) / 10000000000000000
-			var username = "Arb bot"
 			if formattedRate >= 0.01 || formattedRate <= -0.01 {
 				if time.Since(previousNotificationTime[symbol]) >= (time.Minute * 30) {
-					content := fmt.Sprintf("Funding rate on %s is now %f", symbol, formattedRate)
-					message := discordwebhook.Message{
-						Username: &username,
-						Content:  &content,
+					dydxRate, err := dydx.GetFunding(symbol)
+					if err != nil {
+						log.Fatal(err)
 					}
-					err := discordwebhook.SendMessage(DISCORD_WEBHOOK_URL, message)
+
+					dailyProfitLeveraged := calculateDailyProfit(formattedRate, dydxRate)
+					dailyProfitPercentageLeveraged := (dailyProfitLeveraged / 2500) * 100
+					dailyProfitThousand := dailyProfitLeveraged / 2.5
+
+					embedList := []discord.Embed{}
+					embedList = append(embedList, discord.NewEmbedBuilder().
+						SetColor(0x005eff).
+						SetURLf("https://kwenta.eth.limo/market/?asset=s%s&accountType=isolated_margin", strings.ToUpper(symbol)).
+						SetTitle(strings.ToUpper(symbol)).
+						AddField("Kwenta funding", fmt.Sprintf("%f%%", formattedRate), true).
+						AddField("DYDX funding", fmt.Sprintf("%.4f%%", dydxRate), true).
+						AddField("Potential daily profit (2.5x lev)", fmt.Sprintf("%.2f%%", dailyProfitPercentageLeveraged), true).
+						AddField("daily profit for 1000$", fmt.Sprintf("$%.2f", dailyProfitThousand), true).
+						SetTimestamp(time.Now()).
+						SetAuthorName("Kwenta").
+						SetFooterText("queried").
+						Build())
+
+					_, err = webhookClient.CreateEmbeds(embedList, rest.WithDelay(2*time.Second))
 					if err != nil {
 						log.Fatal(err)
 					}
 					fmt.Printf("%s: %f\n", symbol, formattedRate)
 					previousNotificationTime[symbol] = time.Now()
+					time.Sleep(5 * time.Second)
 				} else {
 					fmt.Printf("%s: %f (Already sent notification within 30 minutes)\n", symbol, formattedRate)
 				}
 			}
 		}
 		time.Sleep(time.Minute)
+	}
+}
+
+func calculateDailyProfit(kwentaRate, dydxRate float64) float64 {
+	// return false for positive, true for negative
+	base := 2500.0
+	if math.Signbit(kwentaRate) {
+		if math.Signbit(dydxRate) {
+			kwentaProfit := (math.Abs(kwentaRate) / 100) * 24 * base
+			dydxProfit := (math.Abs(dydxRate) / 100) * 24 * base
+			var totalProfit float64
+			if kwentaProfit >= dydxProfit {
+				totalProfit = kwentaProfit - dydxProfit
+			} else {
+				totalProfit = dydxProfit - kwentaProfit
+			}
+			return totalProfit
+		} else {
+			kwentaProfit := (math.Abs(kwentaRate) / 100) * 24 * base
+			dydxProfit := (math.Abs(dydxRate) / 100) * 24 * base
+			return kwentaProfit + dydxProfit
+		}
+	} else {
+		if math.Signbit(dydxRate) {
+			kwentaProfit := (math.Abs(kwentaRate) / 100) * 24 * base
+			dydxProfit := (math.Abs(dydxRate) / 100) * 24 * base
+			return kwentaProfit + dydxProfit
+		} else {
+			kwentaProfit := (math.Abs(kwentaRate) / 100) * 24 * base
+			dydxProfit := (math.Abs(dydxRate) / 100) * 24 * base
+			var totalProfit float64
+			if kwentaProfit >= dydxProfit {
+				totalProfit = kwentaProfit - dydxProfit
+			} else {
+				totalProfit = dydxProfit - kwentaProfit
+			}
+			return totalProfit
+		}
 	}
 }

@@ -13,6 +13,7 @@ COPY go.sum .
 RUN go mod download
 
 COPY ./contracts ./contracts
+COPY ./dydx ./dydx
 
 COPY *go .
 
