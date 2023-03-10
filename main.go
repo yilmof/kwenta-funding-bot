@@ -84,16 +84,16 @@ func main() {
 						log.Fatal(err)
 					}
 
-					dailyProfitLeveraged := calculateDailyProfit(formattedRate, dydxRate)
+					dailyProfitLeveraged := calculateDailyProfit(formattedRate, dydxRate, 2500)
 					dailyProfitPercentageLeveraged := (dailyProfitLeveraged / 2500) * 100
-					dailyProfitThousand := dailyProfitLeveraged / 2.5
+					dailyProfitThousand := calculateDailyProfit(formattedRate, dydxRate, 1000)
 
 					embedList := []discord.Embed{}
 					embedList = append(embedList, discord.NewEmbedBuilder().
 						SetColor(0x005eff).
 						SetURLf("https://kwenta.eth.limo/market/?asset=s%s&accountType=isolated_margin", strings.ToUpper(symbol)).
 						SetTitle(strings.ToUpper(symbol)).
-						AddField("Kwenta funding", fmt.Sprintf("%f%%", formattedRate), true).
+						AddField("Kwenta funding", fmt.Sprintf("%.4f%%", formattedRate), true).
 						AddField("DYDX funding", fmt.Sprintf("%.4f%%", dydxRate), true).
 						AddField("Potential daily profit (2.5x lev)", fmt.Sprintf("%.2f%%", dailyProfitPercentageLeveraged), true).
 						AddField("daily profit for 1000$", fmt.Sprintf("$%.2f", dailyProfitThousand), true).
@@ -118,9 +118,8 @@ func main() {
 	}
 }
 
-func calculateDailyProfit(kwentaRate, dydxRate float64) float64 {
+func calculateDailyProfit(kwentaRate, dydxRate, base float64) float64 {
 	// return false for positive, true for negative
-	base := 2500.0
 	if math.Signbit(kwentaRate) {
 		if math.Signbit(dydxRate) {
 			kwentaProfit := (math.Abs(kwentaRate) / 100) * 24 * base
