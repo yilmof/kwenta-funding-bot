@@ -48,7 +48,7 @@ func main() {
 		"uni":   "0xda3a5e9502b23Eaedc8cC048998893013e09787d",
 	}
 
-	previousNotificationTime := time.Time{}
+	previousNotificationTime := make(map[string]time.Time)
 
 	fmt.Println("Checking funding rates...")
 	for {
@@ -67,7 +67,7 @@ func main() {
 			formattedRate := (floatRate / 24) / 10000000000000000
 			var username = "Arb bot"
 			if formattedRate >= 0.01 || formattedRate <= -0.01 {
-				if time.Since(previousNotificationTime) >= (time.Minute * 30) {
+				if time.Since(previousNotificationTime[symbol]) >= (time.Minute * 30) {
 					content := fmt.Sprintf("Funding rate on %s is now %f", symbol, formattedRate)
 					message := discordwebhook.Message{
 						Username: &username,
@@ -78,7 +78,7 @@ func main() {
 						log.Fatal(err)
 					}
 					fmt.Printf("%s: %f\n", symbol, formattedRate)
-					previousNotificationTime = time.Now()
+					previousNotificationTime[symbol] = time.Now()
 				} else {
 					fmt.Printf("%s: %f (Already sent notification within 30 minutes)\n", symbol, formattedRate)
 				}
@@ -86,5 +86,4 @@ func main() {
 		}
 		time.Sleep(time.Minute)
 	}
-
 }
