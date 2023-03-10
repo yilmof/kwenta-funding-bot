@@ -78,7 +78,7 @@ func main() {
 			floatRate, _ := (big.NewFloat(0).SetInt(rate)).Float64()
 			formattedRate := (floatRate / 24) / 10000000000000000
 			if formattedRate >= 0.01 || formattedRate <= -0.01 {
-				if time.Since(previousNotificationTime[symbol]) >= (time.Minute * 30) {
+				if time.Since(previousNotificationTime[symbol]) >= (time.Hour * 6) {
 					dydxRate, err := dydx.GetFunding(symbol)
 					if err != nil {
 						log.Fatal(err)
