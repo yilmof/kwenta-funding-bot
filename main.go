@@ -102,13 +102,12 @@ func main() {
 						SetFooterText("queried").
 						Build())
 
-					_, err = webhookClient.CreateEmbeds(embedList, rest.WithDelay(2*time.Second))
+					_, err = webhookClient.CreateEmbeds(embedList, rest.WithDelay(5*time.Second))
 					if err != nil {
 						log.Fatal(err)
 					}
 					fmt.Printf("%s: %f\n", symbol, formattedRate)
 					previousNotificationTime[symbol] = time.Now()
-					time.Sleep(5 * time.Second)
 				} else {
 					fmt.Printf("%s: %f (Already sent notification within 30 minutes)\n", symbol, formattedRate)
 				}
