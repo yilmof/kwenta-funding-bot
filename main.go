@@ -9,6 +9,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -88,6 +89,22 @@ func main() {
 					dailyProfitPercentageLeveraged := (dailyProfitLeveraged / 2500) * 100
 					dailyProfitThousand := calculateDailyProfit(formattedRate, dydxRate, 1000)
 
+					shortSkewPrcnt, err := getSkew(instance)
+					if err != nil {
+						log.Fatal(err)
+					}
+					longSkewPrcnt := 1 - shortSkewPrcnt
+					shortRounded := math.Round(shortSkewPrcnt * 100)
+					longRounded := math.Round(longSkewPrcnt * 100)
+					fundingMsg := ""
+					if longRounded > shortRounded {
+						fundingMsg = "⬆️"
+					} else if shortRounded < longRounded {
+						fundingMsg = "⬇️"
+					} else {
+						fundingMsg = "🔃"
+					}
+
 					embedList := []discord.Embed{}
 					embedList = append(embedList, discord.NewEmbedBuilder().
 						SetColor(0x005eff).
@@ -96,6 +113,9 @@ func main() {
 						AddField("Kwenta funding", fmt.Sprintf("%.4f%%", formattedRate), true).
 						AddField("DYDX funding", fmt.Sprintf("%.4f%%", dydxRate), true).
 						AddField("Potential daily profit (2.5x lev)", fmt.Sprintf("%.2f%%", dailyProfitPercentageLeveraged), true).
+						AddField("Skew Long", strconv.Itoa(int(longRounded))+"%", false).
+						AddField("Skew Short", strconv.Itoa(int(shortRounded))+"%", true).
+						AddField("Funding", fundingMsg, true).
 						AddField("daily profit for 1000$", fmt.Sprintf("$%.2f", dailyProfitThousand), true).
 						SetTimestamp(time.Now()).
 						SetAuthorName("Kwenta").
@@ -152,4 +172,15 @@ func calculateDailyProfit(kwentaRate, dydxRate, base float64) float64 {
 			return totalProfit
 		}
 	}
+}
+
+func getSkew(instance *contracts.Contracts) (float64, error) {
+	skew, err := instance.MarketSizes(nil)
+	if err != nil {
+		return 0, err
+	}
+	skewLong, _ := (big.NewFloat(0).SetInt(skew.Long)).Float64()
+	skewShort, _ := (big.NewFloat(0).SetInt(skew.Short)).Float64()
+	skewShortPrcnt := skewShort / (skewLong + skewShort)
+	return skewShortPrcnt, nil
 }
