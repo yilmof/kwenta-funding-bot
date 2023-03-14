@@ -99,7 +99,7 @@ func main() {
 					fundingMsg := ""
 					if longRounded > shortRounded {
 						fundingMsg = "⬆️"
-					} else if shortRounded < longRounded {
+					} else if longRounded < shortRounded {
 						fundingMsg = "⬇️"
 					} else {
 						fundingMsg = "🔃"
