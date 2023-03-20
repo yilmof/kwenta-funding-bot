@@ -63,3 +63,26 @@ func GetFunding(symbol string) (float64, error) {
 
 	return rate * 100, nil
 }
+
+func GetPrice(symbol string) (float64, error) {
+	url := fmt.Sprintf("https://api.dydx.exchange/v3/markets?market=%s-USD", strings.ToUpper(symbol))
+	resp, err := http.Get(url)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, err
+	}
+
+	m := &MarketsResponse{}
+	if err := json.Unmarshal(body, m); err != nil {
+		return 0, err
+	}
+
+	price, _ := strconv.ParseFloat(m.Markets[fmt.Sprintf("%s-USD", strings.ToUpper(symbol))].IndexPrice, 32)
+
+	return price, nil
+}
