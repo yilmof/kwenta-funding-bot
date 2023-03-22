@@ -197,6 +197,8 @@ func main() {
 						}
 						account.Positions[0].UpdatePrices(kwentaPrice, dydxPrice)
 						log.Println("Updated prices for current position")
+						currentBalance := account.Balance + account.Positions[0].KwentaPL + account.Positions[0].DydxPL
+						log.Printf("Current balance: $%.2f\n", currentBalance)
 						time.Sleep(5 * time.Minute)
 					}
 				}()
